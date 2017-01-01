@@ -25,35 +25,43 @@ class ZipRecord {
 
 function ZipCodeDb() {
 	const byZipCode = {};
-	const byName = {};
-	
-	function addByZipCode(zipRecord) {
-		let existing = byZipCode[zipRecord.zip];
-		if (existing == null) byZipCode[zipRecord.zip] = existing = [];
-		existing.push(zipRecord);
-	}	
-
-	function addByName(zipRecord) {
-		const name = zipRecord.city + ", " + zipRecord.state; // e.g. "Philadelphia, PA"
-		const len = name.length;
-		
-		function addByNameImpl(node, charIndex) {
-			if (charIndex >= len) {
-				if (node.match == null) node.match = { name, records: [] };
-				node.match.records.push(zipRecord);
-				return;
-			}
-			
-			const c = name.charAt(charIndex).toLowerCase();
-		    let child = node[c];
-			if (child == null) child = node[c] = {};
-			addByNameImpl(child, charIndex+1);
-		}
-		
-		addByNameImpl(byName, 0);
-	}
+	const byState = {};
 	
 	this.add = zipRecord => {
+		function addByZipCode(zipRecord) {
+			let existing = byZipCode[zipRecord.zip];
+			if (existing == null) byZipCode[zipRecord.zip] = existing = [];
+			existing.push(zipRecord);
+		}	
+		
+		function addByName(zipRecord) {
+			const name = zipRecord.city;
+			const len = name.length;
+			
+			function addByNameImpl(node, charIndex) {
+				if (charIndex >= len) {
+					if (node.match == null) node.match = { name, records: [] };
+					node.match.records.push(zipRecord);
+					return;
+				}
+				
+				const c = name.charAt(charIndex).toLowerCase();
+				let child = node[c];
+				if (child == null) child = node[c] = {};
+				addByNameImpl(child, charIndex+1);
+			}
+
+			function ensureState(state) {
+				var state = state.toLowerCase();
+				var result = byState[state];
+				if (result == null) result = byState[state] = {};
+				return result;
+			}
+
+			var root = ensureState(zipRecord.state);
+			addByNameImpl(root, 0);
+		}
+		
 		addByZipCode(zipRecord);
 		addByName(zipRecord);
 	}
@@ -62,13 +70,17 @@ function ZipCodeDb() {
 		return byZipCode[zipCode] || [];
 	}
 	
-	this.findByName = function(name, maxMatches) {
-		var start = byName;
-		name = name.toLowerCase();
+	this.findByName = function(name, searchState, maxMatches) {
 		
-		for (let c of name) {
-			start = start[c];	
-			if (start == null) return [];
+		function getProps(obj, maxPropNameLength) {
+			var props = [];
+			for (let prop in obj) {
+				if (!obj.hasOwnProperty(prop)) continue;
+				if (prop.length > maxPropNameLength) continue;
+				props.push(prop);
+			}
+			props.sort();
+			return props;
 		}
 		
 		var result = [];
@@ -79,16 +91,37 @@ function ZipCodeDb() {
 				if (result.length >= maxMatches) return false;
 			}
 			
-			for (let prop in node) {
-				if (!node.hasOwnProperty(prop)) continue;
-				if (prop.length > 1) continue;
-				if (!addChildrenOf(node[prop])) return false;
+			for (let c of getProps(node, 1)) {
+				if (!addChildrenOf(node[c])) return false;
 			}
 			
 			return true;
 		}
 		
-		addChildrenOf(start);
+		function getStartNode(state) {
+			let node = byState[state];
+			if (node == null) return null;
+			
+			for (let c of name) {
+				node = node[c];	
+				if (node == null) return null;
+			}
+			
+			return node;
+		}
+		
+		function getStates() {
+			if (searchState != null) return [searchState.toLowerCase()];
+			return getProps(byState, 2);
+		}
+		
+		name = name.toLowerCase();
+		
+		for (let state of getStates()) {
+			var start = getStartNode(state);
+			if (start == null) continue;
+			if (!addChildrenOf(start)) break;
+		}
 		
 		return result;
 	}
@@ -114,22 +147,27 @@ function readZipCodeDbFromCsv(stream) {
 
 const dataFile = "data/zipcodes.csv";
 
+
 console.log("loading...");
 readZipCodeDbFromCsv(dataFile).then(db=>{
 	console.log(db.findByZip("07405"));
 	
-	var butler = db.findByName("Butler", 10);
-	print(butler);
+	print(db.findByName("But", "NJ", 10));
+	console.log("--");
+	print(db.findByName("But", null, 10));
+})
+.catch(err=> {
+	console.log(err);
 });
 
-/*
+
 var db = new ZipCodeDb();
 db.add(new ZipRecord("07405", "Butler", "NJ"));
 db.add(new ZipRecord("12345", "Butler", "PA"));
 db.add(new ZipRecord("33333", "Buchanan", "GA"));
 db.add(new ZipRecord("33334", "Buchanan", "GA"));
 
-var result = db.findByName("b", 3);
-print(result);
-*/
+print(db.findByName("b", "PA", 3));
+console.log("--");
+print(db.findByName("b", null, 10));
 
