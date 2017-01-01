@@ -18,39 +18,42 @@ class ZipRecord {
 	toString() { return `${this.city}, ${this.state} ${this.zip}`; }
 }
 
-function ZipCodeDb(stream) {
+function ZipCodeDb() {
 	const byZipCode = {};
 	
-	const input = (typeof stream === "string") ? fs.createReadStream(dataFile) : stream;
-	const csvParser = csv({delimiter:',', columns:true});
-	
-	function addRecord(record) {
-		const obj = new ZipRecord(record.Zipcode, record.City, record.State);
-		let existing = byZipCode[obj.zip];
-		if (existing == null) byZipCode[obj.zip] = existing = [];
-		existing.push(obj);
+	this.add = zipRecord => {
+		let existing = byZipCode[zipRecord.zip];
+		if (existing == null) byZipCode[zipRecord.zip] = existing = [];
+		existing.push(zipRecord);
 	}
 	
-	const csvTransformer = transform(addRecord, {parallel: 10, consume: true});
-	const readyPromise = new Promise((resolve,reject)=>{
-		const loading = input.pipe(csvParser).pipe(csvTransformer);
-		loading.on("finish", ()=>resolve(this));
-	});
-	
-	this.ready = function(callback) {
-		readyPromise.then(db=>callback(db));
-	}
-
 	this.findByZip = function(zipCode) {
 		return byZipCode[zipCode] || [];
 	}
 }
 
+function readZipCodeDb(stream) {
+
+	const input = (typeof stream === "string") ? fs.createReadStream(dataFile) : stream;
+	const csvParser = csv({delimiter:',', columns:true});
+	const db = new ZipCodeDb();
+	
+	function addCsvRecord(csvRecord) {
+		db.add(new ZipRecord(csvRecord.Zipcode, csvRecord.City, csvRecord.State));
+	}
+	
+	const csvTransformer = transform(addCsvRecord, {parallel: 10, consume: true});
+	
+	return new Promise((resolve,reject)=>{
+		const loading = input.pipe(csvParser).pipe(csvTransformer);
+		loading.on("finish", ()=>resolve(db));
+	});
+}
 
 const dataFile = "data/zipcodes.csv";
 
 console.log("loading...");
-new ZipCodeDb(dataFile).ready(db=>{
+readZipCodeDb(dataFile).then(db=>{
 	console.log(db.findByZip("07405"));
 });
 
