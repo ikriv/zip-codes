@@ -2,6 +2,8 @@
 const fs = require('fs');
 const csv = require('csv-parse');
 const transform = require('stream-transform');
+const http = require('http');
+const PORT = 8888;
 
 function print(obj) {
 	const util = require('util');
@@ -147,20 +149,37 @@ function readZipCodeDbFromCsv(stream) {
 
 const dataFile = "data/zipcodes.csv";
 
-
-console.log("loading...");
-readZipCodeDbFromCsv(dataFile).then(db=>{
-	console.log(db.findByZip("07405"));
+function startZipCodeHttpServer(db) {
+	var express = require("express");
+	var app = express();
+	app.get("/v1/zip/:zipCode", function(request, response) {
+		const result = db.findByZip(request.params.zipCode);
+		response.json(result);
+	});
 	
-	print(db.findByName("But", "NJ", 10));
-	console.log("--");
-	print(db.findByName("But", null, 10));
-})
-.catch(err=> {
-	console.log(err);
-});
+	app.get("/v1/search", function(request,response) {
+		const state = request.query.state;
+		const name = request.query.name;
+		let maxMatches = request.query.max;
+		if (maxMatches == null) maxMatches = 100;
+		const result = db.findByName(name, state, maxMatches);
+		response.json(result);
+	});
+	
+	var server = app.listen(PORT, function() {
+		const host = server.address().address;
+		const port = server.address().port;
+		console.log(`Listening at http://${host}:${port}`);
+	});
+}
+
+console.log("Loading database...");
+readZipCodeDbFromCsv(dataFile)
+.then(startZipCodeHttpServer)
+.catch(err=> console.log(err));
 
 
+/*
 var db = new ZipCodeDb();
 db.add(new ZipRecord("07405", "Butler", "NJ"));
 db.add(new ZipRecord("12345", "Butler", "PA"));
@@ -170,4 +189,4 @@ db.add(new ZipRecord("33334", "Buchanan", "GA"));
 print(db.findByName("b", "PA", 3));
 console.log("--");
 print(db.findByName("b", null, 10));
-
+*/
