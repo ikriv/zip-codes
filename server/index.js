@@ -2,7 +2,6 @@
 const fs = require('fs');
 const csv = require('csv-parse');
 const transform = require('stream-transform');
-const http = require('http');
 const PORT = 8888;
 
 function print(obj) {
