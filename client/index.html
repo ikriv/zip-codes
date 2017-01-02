@@ -104,22 +104,24 @@ class View {
 	get city() { return $("#city").val(); }
 }
 
-class ZipCodesService {
-	constructor() {
-		this.baseUrl = "http://localhost:8888/v1";
-	}
+function ZipCodesService() {
+	const baseUrl = "http://localhost:8888/v1";
+	const searchReady = new Rx.Subject();
 	
-	search(city, state) {
-		let url = this.baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
+	this.searchReady = searchReady.asObservable();
+	
+	this.search = (city, state) => {
+		let url = baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
 		if (state) url += "&state=" + state;
 		
-		var request = $.getJSON(url);
-		request.url = url;
-		return request;
-	}
+		$.getJSON(url).then(
+			data => searchReady.next(data),
+			err => { err.url = url; searchReady.error(err); }
+		);
+	};
 	
-	getStates() {
-		const url = this.baseUrl + "/states";
+	this.getStates = () => {
+		const url = baseUrl + "/states";
 		return $.getJSON(url)
 	}
 }
@@ -128,6 +130,7 @@ class Controller {
 	constructor() {
 		this.view = new View();
 		this.zipCodes = new ZipCodesService();
+		this.wireSearchReady();
 	}
 	
 	init() {
@@ -155,10 +158,13 @@ class Controller {
 			return;
 		}
 		
-		this.zipCodes.search(view.city, view.states.selected)
-		.then( 
-			data=>view.results.setData(data), 
-			err=>view.httpError("Cannot retrieve list of cities").show(err, request.url)
+		this.zipCodes.search(view.city, view.states.selected);
+	}
+	
+	wireSearchReady() {
+		this.zipCodes.searchReady.subscribe(
+			data=>this.view.results.setData(data), 
+			err=>this.view.httpError("Cannot retrieve list of cities").show(err, err.url)
 		);
 	}
 }
