@@ -2,6 +2,7 @@
 const fs = require('fs');
 const csv = require('csv-parse');
 const transform = require('stream-transform');
+const dataFile = "server/data/zipcodes.csv";
 const PORT = 8888;
 
 function print(obj) {
@@ -150,8 +151,6 @@ function readZipCodeDbFromCsv(stream) {
 		loading.on("finish", ()=>resolve(db));
 	});
 }
-
-const dataFile = "data/zipcodes.csv";
 
 function startZipCodeHttpServer(db) {
 	var express = require("express");

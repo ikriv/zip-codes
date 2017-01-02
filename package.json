@@ -4,6 +4,7 @@
   "description": "Search by zip code",
   "main": "index.js",
   "scripts": {
+    "server": "node server/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Ivan Krivyakov",
