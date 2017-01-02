@@ -28,6 +28,17 @@ function ZipCodeDb() {
 	const byZipCode = {};
 	const byState = {};
 	
+	function getProps(obj, maxPropNameLength) {
+		var props = [];
+		for (let prop in obj) {
+			if (!obj.hasOwnProperty(prop)) continue;
+			if (prop.length > maxPropNameLength) continue;
+			props.push(prop);
+		}
+		props.sort();
+		return props;
+	}
+	
 	this.add = zipRecord => {
 		function addByZipCode(zipRecord) {
 			let existing = byZipCode[zipRecord.zip];
@@ -73,17 +84,6 @@ function ZipCodeDb() {
 	
 	this.findByName = function(name, searchState, maxMatches) {
 		
-		function getProps(obj, maxPropNameLength) {
-			var props = [];
-			for (let prop in obj) {
-				if (!obj.hasOwnProperty(prop)) continue;
-				if (prop.length > maxPropNameLength) continue;
-				props.push(prop);
-			}
-			props.sort();
-			return props;
-		}
-		
 		var result = [];
 		
 		function addChildrenOf(node) {
@@ -126,6 +126,11 @@ function ZipCodeDb() {
 		
 		return result;
 	}
+	
+	this.getStates = function() { 
+		var states = getProps(byState,2).map(s=>s.toUpperCase());
+		return states;
+	}
 }
 
 function readZipCodeDbFromCsv(stream) {
@@ -154,6 +159,10 @@ function startZipCodeHttpServer(db) {
 	app.get("/v1/zip/:zipCode", function(request, response) {
 		const result = db.findByZip(request.params.zipCode);
 		response.json(result);
+	});
+	
+	app.get("/v1/states", function(request, response) {
+		response.json(db.getStates());
 	});
 	
 	app.get("/v1/search", function(request,response) {
