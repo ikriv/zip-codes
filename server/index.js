@@ -152,9 +152,20 @@ function readZipCodeDbFromCsv(stream) {
 	});
 }
 
+function enableCors(app) {
+	app.use(function(req, res, next) {
+	  res.header("Access-Control-Allow-Origin", "*");
+	  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+	  next();
+	});	
+}
+
 function startZipCodeHttpServer(db) {
 	var express = require("express");
 	var app = express();
+	
+	enableCors(app);
+	
 	app.get("/v1/zip/:zipCode", function(request, response) {
 		const result = db.findByZip(request.params.zipCode);
 		response.json(result);
