@@ -5,10 +5,10 @@
   src="https://code.jquery.com/jquery-3.1.1.min.js"
   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
   crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/5.0.1/Rx.min.js"></script>
 <style>
 .error { color: red }
 .main { display: none }
-
 </style>
 </head>
 <body>
@@ -18,105 +18,154 @@
 	<p>Start typing city name:&nbsp;
 	<input id="city" type="text" size="20"></input>
 	<select id="states"></select>
-	<input type="button" value="Search" onclick="onSearch()"></input>
+	<input type="button" value="Search" onclick="controller.onSearch()"></input>
 	</p>
 </div>
 <div class="error"></div>
 <div class="results"></div>
 <script>
-$(function() {
+class ErrorDiv {
+	clear() { $(".error").text(""); }
+	show(text) { $(".error").text(text); }
+	fatal(text) { this.show(text); $(".main").hide(); $(".loading").hide(); }
+}
+
+class ResultsDiv {
+	clear() { $(".results").empty();}
+	setData(data) {
+		if (data == null || data.length === 0) {
+			$(".results").text("No results found");
+			return;
+		}
+		var table = $("<table></table>");
+		for (let item of data) {
+			if (!item.records) continue;
+			var tdName = $("<td></td>");
+			tdName.text(item.name);
+			
+			var tdZip = $("<td></td>");
+			tdZip.text(item.records.map(r=>r.zip).join(","));
+			
+			var tr = $("<tr></tr>");
+			tr.append(tdName);
+			tr.append(tdZip);
+			table.append(tr);
+		}
+		$(".results").append(table);
 	
-	populateStates()
-	.then( ()=> {
-		$("#city").focus();
-	});
-});
-
-function onSearch() {
-	clearResults();
-	var request = sendSearchRequest();
-	request.then( 
-		handleSearchResponse, 
-		err=>error.show("Error getting list of cities: " + getHttpErrorText(err, request.url)));
+	}
 }
 
-function clearResults() {
-	$(".results").empty();
-}
-
-var error = {
-	clear: function() { $(".error").text(""); },
-	show: function(text) { $(".error").text(text); },
-	fatal: function(text) { error.show(text); $(".main").hide(); $(".loading").hide(); }
-}
-
-const baseUrl = "http://localhost:8888/v1";
-
-function pageLoaded() {
-	$(".loading").hide();
-	$(".main").show();
-}
-
-function getHttpErrorText(err, url) {
-    if (err.readyState === 0) return "Cannot connect to the server at " + url;
-	return "The server returned " + err.status + " " + err.statusText + " for " + url;
-}
-
-function populateStates() {
-	const url = baseUrl + "/states";
-	return $.getJSON(url)
-		.then(states => {
-			const ctrlStates = $("#states");
+class StatesControl {
+	get selected() { return $("#states").val();}
+	
+	setData(states) {
+		const ctrlStates = $("#states");
 			
-			function addState(state) { 
-				ctrlStates.append($("<option></option>")
-                    .attr("value",state)
-                    .text(state)); 
-			}
-			
-			addState("");
-			states.forEach(state=>addState(state));
-			pageLoaded();
-			
-		},
-		err => error.fatal("Cannot retrieve the list of states: " + getHttpErrorText(err, url)));
+		function addState(state) { 
+			ctrlStates.append($("<option></option>")
+				.attr("value",state)
+				.text(state)); 
+		}
+		
+		addState("");
+		states.forEach(state=>addState(state));	
+	}
 }
 
-function sendSearchRequest() {
-	error.clear();
-	const city = $("#city").val();
-	if (!city) {
-		error.show("Please enter fisrt few letters of city name: city name cannot be empty");
-		return;
+class HttpError {
+	constructor(description, errorDiv) {
+		this.description = description;
+		this.error = errorDiv;
+	}
+	getHttpErrorText(err, url) { 
+		if (err.readyState === 0) return "Cannot connect to the server at " + url;
+		return "The server returned " + err.status + " " + err.statusText + " for " + url;
+	}
+	getText(err, url) {
+		return this.description + ": " + this.getHttpErrorText(err, url);
+	}
+	show(err, url) { this.error.show(this.getText(err, url)); }
+	fatal(err, url) { this.error.fatal(this.getText(err, url)); }
+}
+
+class View {
+	constructor() {
+		this.error = new ErrorDiv();
+		this.results = new ResultsDiv();
+		this.states = new StatesControl();
+	}
+	markAsLoaded() {
+		$(".loading").hide();
+		$(".main").show();
+	}
+	httpError(description) { return new HttpError(description, this.error); }
+	focusOnCity() { $("#city").focus(); }
+	get city() { return $("#city").val(); }
+}
+
+class ZipCodesService {
+	constructor() {
+		this.baseUrl = "http://localhost:8888/v1";
 	}
 	
-	let url = baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
-	const state = $("#states").val();
-	if (state) url += "&state=" + state;
+	search(city, state) {
+		let url = this.baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
+		if (state) url += "&state=" + state;
+		
+		var request = $.getJSON(url);
+		request.url = url;
+		return request;
+	}
 	
-	var request = $.getJSON(url);
-	request.url = url;
-	return request;
+	getStates() {
+		const url = this.baseUrl + "/states";
+		return $.getJSON(url)
+	}
 }
 
-function handleSearchResponse(data) {
-	if (!data) return;
-	var table = $("<table></table>");
-	for (let item of data) {
-		if (!item.records) continue;
-		var tdName = $("<td></td>");
-		tdName.text(item.name);
-		
-		var tdZip = $("<td></td>");
-		tdZip.text(item.records.map(r=>r.zip).join(","));
-		
-		var tr = $("<tr></tr>");
-		tr.append(tdName);
-		tr.append(tdZip);
-		table.append(tr);
+class Controller {
+	constructor() {
+		this.view = new View();
+		this.zipCodes = new ZipCodesService();
 	}
-	$(".results").append(table);
+	
+	init() {
+		this.populateStates()
+		.then(()=>this.view.focusOnCity());
+	}
+	
+	populateStates() {
+		return this.zipCodes.getStates()
+		.then(
+			states => {
+					this.view.states.setData(states);
+					this.view.markAsLoaded();
+				},
+			err => this.view.httpError("Cannot retrieve the list of states").fatal(err, url)
+		);
+	}
+	
+	onSearch() {
+		const view = this.view;
+		view.results.clear();
+		view.error.clear();
+		if (!view.city) {
+			view.error.show("Please enter fisrt few letters of city name: city name cannot be empty");
+			return;
+		}
+		
+		this.zipCodes.search(view.city, view.states.selected)
+		.then( 
+			data=>view.results.setData(data), 
+			err=>view.httpError("Cannot retrieve list of cities").show(err, request.url)
+		);
+	}
 }
+
+var controller = new Controller();	
+$(()=>controller.init());
+
 </script>
 </body>
 </html>
