@@ -48,17 +48,20 @@ function ZipCodeDb() {
 		}	
 		
 		function addByName(zipRecord) {
-			const name = zipRecord.city;
-			const len = name.length;
+			const city = zipRecord.city;
+			const len = city.length;
 			
 			function addByNameImpl(node, charIndex) {
 				if (charIndex >= len) {
-					if (node.match == null) node.match = { name, records: [] };
+					if (node.match == null) {
+						const name = zipRecord.city + ", " + zipRecord.state.toUpperCase();
+						node.match = { name, records: [] };
+					}
 					node.match.records.push(zipRecord);
 					return;
 				}
 				
-				const c = name.charAt(charIndex).toLowerCase();
+				const c = city.charAt(charIndex).toLowerCase();
 				let child = node[c];
 				if (child == null) child = node[c] = {};
 				addByNameImpl(child, charIndex+1);
