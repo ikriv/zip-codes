@@ -1,15 +1,15 @@
 {
   "name": "zip-codes",
   "version": "1.0.0",
-  "description": "Search by zip code",
-  "main": "index.js",
+  "description": "Search city by zip code",
+  "main": "server/index.js",
   "scripts": {
-    "server": "node server/index.js",
+    "start": "node server/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Ivan Krivyakov",
   "license": "ISC",
-  "devDependencies": {
+  "dependencies": {
     "csv-parse": "^1.1.7",
     "express": "^4.14.0",
     "fs": "0.0.1-security",

@@ -169,6 +169,8 @@ function startZipCodeHttpServer(db) {
 	
 	enableCors(app);
 	
+	app.use(express.static("client"));
+	
 	app.get("/v1/zip/:zipCode", function(request, response) {
 		const result = db.findByZip(request.params.zipCode);
 		response.json(result);
