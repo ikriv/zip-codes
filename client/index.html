@@ -18,7 +18,6 @@
 	<p>Start typing city name:&nbsp;
 	<input id="city" type="text" size="20"></input>
 	<select id="states"></select>
-	<input id="search" type="button" value="Search"></input>
 	</p>
 </div>
 <div class="error"></div>
@@ -133,6 +132,8 @@ function ZipCodesService() {
 	const baseUrl = "http://localhost:8888/v1";
 	
 	this.search = (city, state) => {
+		if (!city) return Rx.Observable.of([]);
+		
 		let url = baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
 		if (state) url += "&state=" + state;
 		
@@ -190,10 +191,10 @@ class Controller {
 	
 	wireSearch() {
 		const view = this.view;
-		Rx.Observable.fromEvent($("#search"), "click")
-			.log("Search-click")
-			.filter(()=>view.city != "")
-			.log("Search-click-filtered")
+		Rx.Observable.merge(
+			Rx.Observable.fromEvent($("#city"), "change keyup paste"),
+			Rx.Observable.fromEvent($("#states"), "change"))
+			.sampleTime(500)
 			.switchMap(()=>this.zipCodes.search(view.city, view.states.selected))
 			.map( data => ({data}))
 			.catch(error => ([{error}]))
