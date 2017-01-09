@@ -18,12 +18,37 @@
 	<p>Start typing city name:&nbsp;
 	<input id="city" type="text" size="20"></input>
 	<select id="states"></select>
-	<input type="button" value="Search" onclick="controller.onSearch()"></input>
+	<input id="search" type="button" value="Search"></input>
 	</p>
 </div>
 <div class="error"></div>
 <div class="results"></div>
 <script>
+(function() {
+	function StopWatch() {
+		function currentTime() { return (new Date()).getTime(); }
+		let start = currentTime();
+		this.ms = function() { return currentTime() - start; }
+	}
+
+	var stopWatch = new StopWatch();
+
+	function log(name, value) { 
+		console.log(stopWatch.ms(), name, value);
+	}
+
+	var logObserver =  function(name) {
+		return {
+			next: 		v=>log(name,v), 
+			error: 		err=>log(name, "ERROR "+err.message), 
+			complete: 	()=>log(name, "DONE")
+		};
+	}
+
+	Rx.Observable.prototype.log = function(name) { return this.do(logObserver(name)); }
+	Rx.Observable.prototype.start = function() { var hot = this.publish(); hot.connect(); return hot; }
+})();
+
 class ErrorDiv {
 	clear() { $(".error").text(""); }
 	show(text) { $(".error").text(text); }
@@ -106,18 +131,19 @@ class View {
 
 function ZipCodesService() {
 	const baseUrl = "http://localhost:8888/v1";
-	const searchReady = new Rx.Subject();
-	
-	this.searchReady = searchReady.asObservable();
 	
 	this.search = (city, state) => {
 		let url = baseUrl + "/search?name=" + encodeURIComponent(city) + "&max=20";
 		if (state) url += "&state=" + state;
 		
+		const searchReady = new Rx.Subject();
+		
 		$.getJSON(url).then(
 			data => searchReady.next(data),
 			err => { err.url = url; searchReady.error(err); }
 		);
+		
+		return searchReady.asObservable();
 	};
 	
 	this.getStates = () => {
@@ -130,7 +156,7 @@ class Controller {
 	constructor() {
 		this.view = new View();
 		this.zipCodes = new ZipCodesService();
-		this.wireSearchReady();
+		this.wireSearch();
 	}
 	
 	init() {
@@ -149,23 +175,29 @@ class Controller {
 		);
 	}
 	
-	onSearch() {
+	onSearchResult(result) {
 		const view = this.view;
 		view.results.clear();
 		view.error.clear();
-		if (!view.city) {
-			view.error.show("Please enter fisrt few letters of city name: city name cannot be empty");
-			return;
+		if (result.data) {
+			view.results.setData(result.data);
 		}
-		
-		this.zipCodes.search(view.city, view.states.selected);
+		else {
+			view.httpError("Cannot retrieve list of cities")
+			    .show(result.error, result.error.url);
+		}
 	}
 	
-	wireSearchReady() {
-		this.zipCodes.searchReady.subscribe(
-			data=>this.view.results.setData(data), 
-			err=>this.view.httpError("Cannot retrieve list of cities").show(err, err.url)
-		);
+	wireSearch() {
+		const view = this.view;
+		Rx.Observable.fromEvent($("#search"), "click")
+			.log("Search-click")
+			.filter(()=>view.city != "")
+			.log("Search-click-filtered")
+			.switchMap(()=>this.zipCodes.search(view.city, view.states.selected))
+			.map( data => ({data}))
+			.catch(error => ([{error}]))
+			.subscribe(result=>this.onSearchResult(result));
 	}
 }
 
