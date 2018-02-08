@@ -6,10 +6,7 @@
   integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
   crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/rxjs/5.0.1/Rx.min.js"></script>
-<style>
-.error { color: red }
-.main { display: none }
-</style>
+ <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <h1>Zip Code Search</h1>
@@ -61,7 +58,7 @@ class ResultsDiv {
 			$(".results").text("No results found");
 			return;
 		}
-		var table = $("<table></table>");
+		var table = $("<table></table>").addClass("cities-table");
 		for (let item of data) {
 			if (!item.records) continue;
 			var tdName = $("<td></td>");

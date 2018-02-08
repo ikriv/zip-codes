@@ -1,0 +1,10 @@
+.error { color: red }
+.main { display: none }
+
+.cities-table {
+    border-collapse: collapse;
+}
+
+.cities-table td {
+    border: black 1px solid;
+}
